@@ -673,12 +673,31 @@ const firebaseConfig = {
         // Update overall statistics
         function updateOverallStatistics() {
             const floorFilter = filterFloor.value;
+            const roomFilter = filterRoom.value; // Get room filter value
+            const dateFilter = filterDate.value; // Get date filter value
+            const typeFilter = filterType.value; // Get type filter value
+
             let filteredRecords = laundryRecords;
             
             if (floorFilter) {
                 filteredRecords = filteredRecords.filter(record => record.floor === parseInt(floorFilter));
             }
             
+            // Apply room filter
+            if (roomFilter) {
+                filteredRecords = filteredRecords.filter(record => record.room === parseInt(roomFilter));
+            }
+
+            // Apply date filter
+            if (dateFilter) {
+                filteredRecords = filteredRecords.filter(record => record.date === dateFilter);
+            }
+
+            // Apply type filter
+            if (typeFilter) {
+                filteredRecords = filteredRecords.filter(record => record.type === typeFilter);
+            }
+
             const totals = {
                 in: { shirts: 0, pants: 0, other: 0, total: 0 },
                 out: { shirts: 0, pants: 0, other: 0, total: 0 },
@@ -880,6 +899,8 @@ const firebaseConfig = {
                 loadRecords();
             } else if (activeTab.includes('date')) { // Added for datewise summary
                 updateDatewiseStatistics();
+            } else if (activeTab.includes('overall')) { // Added for overall summary
+                updateOverallStatistics();
             }
         });
 
@@ -889,6 +910,8 @@ const firebaseConfig = {
                 loadRecords();
             } else if (activeTab.includes('date')) {
                 updateDatewiseStatistics();
+            } else if (activeTab.includes('overall')) { // Added for overall summary
+                updateOverallStatistics();
             }
         });
 
@@ -898,6 +921,8 @@ const firebaseConfig = {
                 loadRecords();
             } else if (activeTab.includes('date')) { // Added for datewise summary
                 updateDatewiseStatistics();
+            } else if (activeTab.includes('overall')) { // Added for overall summary
+                updateOverallStatistics();
             }
         });
 
