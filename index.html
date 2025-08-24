@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laundry Record System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <style>
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+        
+        .notification.success {
+            background-color: #10b981;
+        }
+        
+        .notification.error {
+            background-color: #ef4444;
+        }
+        
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        .room-card {
+            transition: all 0.3s ease;
+        }
+        
+        .room-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .in-stats {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .out-stats {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        
+        .summary-stats {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+        
+        .date-total-card {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+        
+        .tabs {
+            display: flex;
+            background: #f3f4f6;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .tab.active {
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            font-weight: 600;
+            color: #3b82f6;
+        }
+
+        /* New style for submitted room buttons */
+        .room-button-submitted {
+            background-color: #d1fae5; /* Light green */
+            color: #065f46; /* Darker green text */
+            border: 1px solid #34d399; /* Green border */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold">🏢 Laundry Management System</h1>
+                <div class="flex space-x-4">
+                    <button id="submitPageBtn" class="px-4 py-2 bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>New Entry
+                    </button>
+                    <button id="recordsPageBtn" class="px-4 py-2 bg-green-600 rounded-lg hover:bg-green-700 transition-colors">
+                        <i class="fas fa-list mr-2"></i>Records
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Notification System -->
+    <div id="notification" class="notification hidden">
+        <span id="notificationMessage"></span>
+    </div>
+
+    <!-- Submit Page -->
+    <div id="submitPage" class="container mx-auto px-4 py-8">
+        <div class="max-w-6xl mx-auto">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">New Laundry Entry</h2>
+                
+                <!-- Basic Information -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Floor</label>
+                        <select id="floorSelect" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Floor</option>
+                            <option value="1">1st Floor</option>
+                            <option value="2">2nd Floor</option>
+                            <option value="3">3rd Floor</option>
+                            <option value="4">4th Floor</option>
+                            <option value="5">5th Floor</option>
+                            <option value="6">6th Floor</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                        <input type="date" id="dateInput" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                        <div class="flex space-x-4" id="typeRadios">
+                            <label class="flex items-center">
+                                <input type="radio" name="type" value="in" class="mr-2">
+                                <span class="text-green-600 font-medium">IN</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="type" value="out" class="mr-2">
+                                <span class="text-red-600 font-medium">OUT</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Room Selection -->
+                <div id="roomSelection" class="hidden">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Select Room</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6 room-buttons">
+                        <!-- Rooms will be dynamically generated here -->
+                    </div>
+                </div>
+
+                <!-- Room Details -->
+                <div id="roomDetails" class="hidden">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-6">Room Laundry Details</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="roomsContainer">
+                        <!-- Room cards will be dynamically generated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Page -->
+    <div id="recordsPage" class="container mx-auto px-4 py-8 hidden">
+        <div class="max-w-7xl mx-auto">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Laundry Records</h2>
+                
+                <!-- Tabs for Statistics View -->
+                <div class="tabs mb-6">
+                    <div class="tab active" onclick="showStatsTab('overall')">Overall Summary</div>
+                    <div class="tab" onclick="showStatsTab('datewise')">Date-wise Summary</div>
+                    <div class="tab" onclick="showStatsTab('detailed')">Detailed Records</div>
+                </div>
+                
+                <!-- Filters -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Floor</label>
+                        <select id="filterFloor" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="">All Floors</option>
+                            <option value="1">1st Floor</option>
+                            <option value="2">2nd Floor</option>
+                            <option value="3">3rd Floor</option>
+                            <option value="4">4th Floor</option>
+                            <option value="5">5th Floor</option>
+                            <option value="6">6th Floor</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Room</label>
+                        <select id="filterRoom" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="">All Rooms</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                        <input type="date" id="filterDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                        <select id="filterType" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="">All Types</option>
+                            <option value="in">IN</option>
+                            <option value="out">OUT</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Overall Statistics -->
+                <div id="overallStatsContainer" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <!-- Overall statistics will be dynamically generated here -->
+                </div>
+
+                <!-- Date-wise Statistics -->
+                <div id="datewiseStatsContainer" class="mb-6 hidden">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Date-wise Summary</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="datewiseStatsGrid">
+                        <!-- Date-wise statistics will be dynamically generated here -->
+                    </div>
+                </div>
+
+                <!-- Records Table -->
+                <div id="recordsTableContainer" class="hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full table-auto">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="px-4 py-3 text-left">Date</th>
+                                    <th class="px-4 py-3 text-left">Floor</th>
+                                    <th class="px-4 py-3 text-left">Room</th>
+                                    <th class="px-4 py-3 text-left">Type</th>
+                                    <th class="px-4 py-3 text-right">Shirts</th>
+                                    <th class="px-4 py-3 text-right">Pants</th>
+                                    <th class="px-4 py-3 text-right">Other</th>
+                                    <th class="px-4 py-3 text-right">Total</th>
+                                    <th class="px-4 py-3 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recordsTableBody">
+                                <!-- Records will be dynamically generated here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="noRecords" class="text-center py-12 text-gray-500 hidden">
+                        <i class="fas fa-inbox text-6xl mb-4"></i>
+                        <p class="text-xl">No records found</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Modal -->
+    <div id="passwordModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Enter Password to Delete</h3>
+            <input type="password" id="deletePassword" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4" placeholder="Password">
+            <div class="flex justify-end space-x-3">
+                <button id="cancelDeleteBtn" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors">Cancel</button>
+                <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Confirm Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+       // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyByTdXGsDkDtBORkQBat4f-QpGA7hOrN6g",
+  authDomain: "loundry-system.firebaseapp.com",
+  projectId: "loundry-system",
+  storageBucket: "loundry-system.firebasestorage.app",
+  messagingSenderId: "550374248172",
+  appId: "1:550374248172:web:19fdd0303be064f7725fc9",
+  measurementId: "G-M85PM64RY4"
+};
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const laundryRef = database.ref('laundryRecords');
+
+        let laundryRecords = []; // This will now be populated from Firebase
+        
+        // Define the password
+        const ADMIN_PASSWORD = "password123654258"; // Your specified password
+
+        // DOM Elements
+        const floorSelect = document.getElementById('floorSelect');
+        const dateInput = document.getElementById('dateInput');
+        const roomSelection = document.getElementById('roomSelection');
+        const roomDetails = document.getElementById('roomDetails');
+        const roomsContainer = document.getElementById('roomsContainer');
+        const submitPage = document.getElementById('submitPage');
+        const recordsPage = document.getElementById('recordsPage');
+        const submitPageBtn = document.getElementById('submitPageBtn');
+        const recordsPageBtn = document.getElementById('recordsPageBtn');
+        const recordsTableBody = document.getElementById('recordsTableBody');
+        const noRecords = document.getElementById('noRecords');
+        const filterFloor = document.getElementById('filterFloor');
+        const filterRoom = document.getElementById('filterRoom');
+        const filterDate = document.getElementById('filterDate');
+        const filterType = document.getElementById('filterType');
+        const overallStatsContainer = document.getElementById('overallStatsContainer');
+        const datewiseStatsContainer = document.getElementById('datewiseStatsContainer');
+        const datewiseStatsGrid = document.getElementById('datewiseStatsGrid');
+        const recordsTableContainer = document.getElementById('recordsTableContainer');
+        const typeRadios = document.getElementById('typeRadios'); // Get the container for type radios
+
+        // Password Modal Elements
+        const passwordModal = document.getElementById('passwordModal');
+        const deletePasswordInput = document.getElementById('deletePassword');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+
+        let recordToDeleteId = null; // To store the ID of the record being deleted
+
+        // Set today's date as default
+        dateInput.valueAsDate = new Date();
+
+        // Generate room numbers (e.g., 101-114, 201-214)
+        function generateRoomNumbers(floor) {
+            const rooms = [];
+            if (floor) {
+                const startRoom = parseInt(floor) * 100 + 1;
+                const endRoom = parseInt(floor) * 100 + 14;
+                for (let i = startRoom; i <= endRoom; i++) {
+                    rooms.push(i);
+                }
+            }
+            return rooms;
+        }
+
+        // Show notification
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const messageEl = document.getElementById('notificationMessage');
+            
+            notification.className = `notification ${type}`;
+            messageEl.textContent = message;
+            notification.classList.remove('hidden');
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.classList.add('hidden'), 300);
+            }, 3000);
+        }
+
+        // Show statistics tab
+        function showStatsTab(tabName) {
+            // Update tab active state
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tab:nth-child(${tabName === 'overall' ? 1 : tabName === 'datewise' ? 2 : 3})`).classList.add('active');
+            
+            // Show/hide containers
+            overallStatsContainer.classList.toggle('hidden', tabName !== 'overall');
+            datewiseStatsContainer.classList.toggle('hidden', tabName !== 'datewise');
+            recordsTableContainer.classList.toggle('hidden', tabName !== 'detailed');
+            
+            // Load appropriate data
+            if (tabName === 'overall') {
+                updateOverallStatistics();
+            } else if (tabName === 'datewise') {
+                updateDatewiseStatistics();
+            } else if (tabName === 'detailed') {
+                loadRecords();
+            }
+        }
+
+        // Update room button colors based on existing records
+        function updateRoomButtonColors() {
+            const currentFloor = floorSelect.value;
+            const currentDate = dateInput.value;
+            const currentType = document.querySelector('input[name="type"]:checked')?.value;
+
+            const roomButtonsContainer = document.querySelector('.room-buttons');
+            if (!roomButtonsContainer || !currentFloor || !currentDate || !currentType) {
+                // If any of the required selections are missing, don't try to update colors
+                return;
+            }
+
+            Array.from(roomButtonsContainer.children).forEach(button => {
+                const roomNumber = parseInt(button.textContent);
+                const hasRecord = laundryRecords.some(record => 
+                    record.floor === parseInt(currentFloor) &&
+                    record.room === roomNumber &&
+                    record.date === currentDate &&
+                    record.type === currentType
+                );
+
+                if (hasRecord) {
+                    button.classList.add('room-button-submitted');
+                    button.classList.remove('bg-blue-100', 'text-blue-700');
+                } else {
+                    button.classList.remove('room-button-submitted');
+                    button.classList.add('bg-blue-100', 'text-blue-700');
+                }
+            });
+        }
+
+        // Floor selection change handler
+        floorSelect.addEventListener('change', function() {
+            const floor = this.value;
+            const roomButtonsContainer = document.querySelector('.room-buttons');
+            
+            if (floor) {
+                roomSelection.classList.remove('hidden');
+                const rooms = generateRoomNumbers(floor); // Pass the selected floor
+                roomButtonsContainer.innerHTML = ''; // Clear existing buttons
+                
+                rooms.forEach(room => {
+                    const button = document.createElement('button');
+                    button.className = 'px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors';
+                    button.textContent = room;
+                    button.onclick = () => addRoomCard(floor, room);
+                    roomButtonsContainer.appendChild(button);
+                });
+                updateRoomButtonColors(); // Update colors after generating buttons
+            } else {
+                roomSelection.classList.add('hidden');
+                roomDetails.classList.add('hidden');
+            }
+        });
+
+        // Event listeners for date and type changes to update room button colors
+        dateInput.addEventListener('change', updateRoomButtonColors);
+        typeRadios.addEventListener('change', updateRoomButtonColors);
+
+
+        // Add room card
+        function addRoomCard(floor, room) {
+            roomDetails.classList.remove('hidden');
+            
+            // Check if room card already exists
+            const existingCard = document.getElementById(`room-${floor}-${room}`);
+            if (existingCard) return;
+            
+            const card = document.createElement('div');
+            card.id = `room-${floor}-${room}`;
+            card.className = 'room-card bg-white border border-gray-200 rounded-xl p-4';
+            card.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="font-semibold text-lg text-gray-800">Floor ${floor} - Room ${room}</h4>
+                    <button onclick="removeRoomCard('${floor}', '${room}')" class="text-red-500 hover:text-red-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Shirts</label>
+                        <input type="number" min="0" value="0" class="shirt-count w-full px-3 py-2 border border-gray-300 rounded-lg" onchange="calculateTotal('${floor}', '${room}')">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Pants</label>
+                        <input type="number" min="0" value="0" class="pant-count w-full px-3 py-2 border border-gray-300 rounded-lg" onchange="calculateTotal('${floor}', '${room}')">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">Other Items</label>
+                        <input type="number" min="0" value="0" class="other-count w-full px-3 py-2 border border-gray-300 rounded-lg" onchange="calculateTotal('${floor}', '${room}')">
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-lg">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Total Items</label>
+                        <input type="number" class="total-count w-full px-3 py-2 bg-transparent font-bold text-blue-600" value="0" readonly>
+                    </div>
+                    <button onclick="submitRoom('${floor}', '${room}')" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+                        <i class="fas fa-check mr-2"></i>Submit
+                    </button>
+                </div>
+            `;
+            
+            roomsContainer.appendChild(card);
+        }
+
+        // Remove room card
+        function removeRoomCard(floor, room) {
+            const card = document.getElementById(`room-${floor}-${room}`);
+            if (card) {
+                card.remove();
+            }
+            
+            // Hide room details if no cards left
+            if (roomsContainer.children.length === 0) {
+                roomDetails.classList.add('hidden');
+            }
+        }
+
+        // Calculate total items
+        function calculateTotal(floor, room) {
+            const card = document.getElementById(`room-${floor}-${room}`);
+            const shirtCount = parseInt(card.querySelector('.shirt-count').value) || 0;
+            const pantCount = parseInt(card.querySelector('.pant-count').value) || 0;
+            const otherCount = parseInt(card.querySelector('.other-count').value) || 0;
+            const total = shirtCount + pantCount + otherCount;
+            
+            card.querySelector('.total-count').value = total;
+        }
+
+        // Submit room data to Firebase
+        function submitRoom(floor, room) {
+            const type = document.querySelector('input[name="type"]:checked');
+            const date = dateInput.value;
+            
+            if (!type || !date) {
+                showNotification('Please select date and type (IN/OUT)', 'error');
+                return;
+            }
+            
+            const card = document.getElementById(`room-${floor}-${room}`);
+            const shirtCount = parseInt(card.querySelector('.shirt-count').value) || 0;
+            const pantCount = parseInt(card.querySelector('.pant-count').value) || 0;
+            const otherCount = parseInt(card.querySelector('.other-count').value) || 0;
+            const total = shirtCount + pantCount + otherCount;
+            
+            if (total === 0) {
+                showNotification('Please enter at least one item', 'error');
+                return;
+            }
+            
+            const newRecordRef = laundryRef.push(); // Generate a unique key
+            const record = {
+                id: newRecordRef.key, // Use Firebase's generated key as the ID
+                date: date,
+                floor: parseInt(floor),
+                room: parseInt(room),
+                type: type.value,
+                shirts: shirtCount,
+                pants: pantCount,
+                other: otherCount,
+                total: total,
+                timestamp: new Date().toISOString()
+            };
+            
+            newRecordRef.set(record)
+                .then(() => {
+                    showNotification(`Room ${room} data submitted successfully!`);
+                    removeRoomCard(floor, room);
+                    // Data will be updated via the 'value' listener, so no need to manually push to laundryRecords array here.
+                })
+                .catch(error => {
+                    showNotification(`Error submitting data: ${error.message}`, 'error');
+                });
+        }
+
+        // Navigation
+        submitPageBtn.addEventListener('click', () => {
+            submitPage.classList.remove('hidden');
+            recordsPage.classList.add('hidden');
+            // Ensure room buttons are updated when navigating back to submit page
+            if (floorSelect.value) {
+                const floor = floorSelect.value;
+                const roomButtonsContainer = document.querySelector('.room-buttons');
+                const rooms = generateRoomNumbers(floor); // Pass the selected floor
+                roomButtonsContainer.innerHTML = ''; 
+                rooms.forEach(room => {
+                    const button = document.createElement('button');
+                    button.className = 'px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors';
+                    button.textContent = room;
+                    button.onclick = () => addRoomCard(floor, room);
+                    roomButtonsContainer.appendChild(button);
+                });
+                updateRoomButtonColors(); // Call updateRoomButtonColors here as well
+                roomSelection.classList.remove('hidden');
+            } else {
+                roomSelection.classList.add('hidden');
+                roomDetails.classList.add('hidden');
+            }
+        });
+
+        recordsPageBtn.addEventListener('click', () => {
+            submitPage.classList.add('hidden');
+            recordsPage.classList.remove('hidden');
+            showStatsTab('overall');
+            updateRoomFilter();
+        });
+
+        // Load records with filtering
+        function loadRecords() {
+            const floorFilter = filterFloor.value;
+            const roomFilter = filterRoom.value;
+            const dateFilter = filterDate.value;
+            const typeFilter = filterType.value;
+            
+            let filteredRecords = laundryRecords;
+            
+            if (floorFilter) {
+                filteredRecords = filteredRecords.filter(record => record.floor === parseInt(floorFilter));
+            }
+            
+            if (roomFilter) {
+                filteredRecords = filteredRecords.filter(record => record.room === parseInt(roomFilter));
+            }
+            
+            if (dateFilter) {
+                filteredRecords = filteredRecords.filter(record => record.date === dateFilter);
+            }
+            
+            if (typeFilter) {
+                filteredRecords = filteredRecords.filter(record => record.type === typeFilter);
+            }
+            
+            recordsTableBody.innerHTML = '';
+            
+            if (filteredRecords.length === 0) {
+                noRecords.classList.remove('hidden');
+            } else {
+                noRecords.classList.add('hidden');
+                filteredRecords.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).forEach(record => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-gray-200 hover:bg-gray-50';
+                    row.innerHTML = `
+                        <td class="px-4 py-3">${record.date}</td>
+                        <td class="px-4 py-3">Floor ${record.floor}</td>
+                        <td class="px-4 py-3">Room ${record.room}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium ${record.type === 'in' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${record.type.toUpperCase()}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-right">${record.shirts}</td>
+                        <td class="px-4 py-3 text-right">${record.pants}</td>
+                        <td class="px-4 py-3 text-right">${record.other}</td>
+                        <td class="px-4 py-3 text-right font-semibold">${record.total}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="promptForDelete('${record.id}')" class="text-red-500 hover:text-red-700">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    recordsTableBody.appendChild(row);
+                });
+            }
+        }
+
+        // Update room filter based on selected floor
+        function updateRoomFilter() {
+            const floor = filterFloor.value;
+            const rooms = generateRoomNumbers(floor); // Pass the selected floor
+            
+            filterRoom.innerHTML = '<option value="">All Rooms</option>';
+            
+            if (floor) {
+                rooms.forEach(room => {
+                    const option = document.createElement('option');
+                    option.value = room;
+                    option.textContent = `Room ${room}`;
+                    filterRoom.appendChild(option);
+                });
+            }
+        }
+
+        // Update overall statistics
+        function updateOverallStatistics() {
+            const floorFilter = filterFloor.value;
+            let filteredRecords = laundryRecords;
+            
+            if (floorFilter) {
+                filteredRecords = filteredRecords.filter(record => record.floor === parseInt(floorFilter));
+            }
+            
+            const totals = {
+                in: { shirts: 0, pants: 0, other: 0, total: 0 },
+                out: { shirts: 0, pants: 0, other: 0, total: 0 },
+                overall: { shirts: 0, pants: 0, other: 0, total: 0 }
+            };
+            
+            filteredRecords.forEach(record => {
+                if (record.type === 'in') {
+                    totals.in.shirts += record.shirts;
+                    totals.in.pants += record.pants;
+                    totals.in.other += record.other;
+                    totals.in.total += record.total;
+                } else {
+                    totals.out.shirts += record.shirts;
+                    totals.out.pants += record.pants;
+                    totals.out.other += record.other;
+                    totals.out.total += record.total;
+                }
+                totals.overall.shirts += record.shirts;
+                totals.overall.pants += record.pants;
+                totals.overall.other += record.other;
+                totals.overall.total += record.total;
+            });
+            
+            overallStatsContainer.innerHTML = `
+                <div class="in-stats text-white p-4 rounded-lg">
+                    <div class="text-lg font-bold mb-2">INCOMING</div>
+                    <div class="text-2xl font-bold">${totals.in.total}</div>
+                    <div class="text-sm">Total Items</div>
+                    <div class="mt-2 text-xs">
+                        S:${totals.in.shirts} | P:${totals.in.pants} | O:${totals.in.other}
+                    </div>
+                </div>
+                <div class="out-stats text-white p-4 rounded-lg">
+                    <div class="text-lg font-bold mb-2">OUTGOING</div>
+                    <div class="text-2xl font-bold">${totals.out.total}</div>
+                    <div class="text-sm">Total Items</div>
+                    <div class="mt-2 text-xs">
+                        S:${totals.out.shirts} | P:${totals.out.pants} | O:${totals.out.other}
+                    </div>
+                </div>
+                <div class="summary-stats text-white p-4 rounded-lg">
+                    <div class="text-lg font-bold mb-2">NET BALANCE</div>
+                    <div class="text-2xl font-bold">${totals.in.total - totals.out.total}</div>
+                    <div class="text-sm">Remaining Items</div>
+                    <div class="mt-2 text-xs">
+                        S:${totals.in.shirts - totals.out.shirts} | P:${totals.in.pants - totals.out.pants} | O:${totals.in.other - totals.out.other}
+                    </div>
+                </div>
+                <div class="stats-card text-white p-4 rounded-lg">
+                    <div class="text-lg font-bold mb-2">OVERALL TOTAL</div>
+                    <div class="text-2xl font-bold">${totals.overall.total}</div>
+                    <div class="text-sm">All Items</div>
+                    <div class="mt-2 text-xs">
+                        S:${totals.overall.shirts} | P:${totals.overall.pants} | O:${totals.overall.other}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update date-wise statistics
+        function updateDatewiseStatistics() {
+            const floorFilter = filterFloor.value;
+            const dateFilter = filterDate.value; // Get date filter value
+            const roomFilter = filterRoom.value; // Get room filter value
+            const typeFilter = filterType.value; // Get type filter value
+
+            let filteredRecords = laundryRecords;
+            
+            if (floorFilter) {
+                filteredRecords = filteredRecords.filter(record => record.floor === parseInt(floorFilter));
+            }
+            
+            // Apply date filter
+            if (dateFilter) {
+                filteredRecords = filteredRecords.filter(record => record.date === dateFilter);
+            }
+
+            // Apply room filter
+            if (roomFilter) {
+                filteredRecords = filteredRecords.filter(record => record.room === parseInt(roomFilter));
+            }
+
+            // Apply type filter
+            if (typeFilter) {
+                filteredRecords = filteredRecords.filter(record => record.type === typeFilter);
+            }
+            
+            // Group by date
+            const dateGroups = {};
+            filteredRecords.forEach(record => {
+                if (!dateGroups[record.date]) {
+                    dateGroups[record.date] = {
+                        date: record.date,
+                        in: { shirts: 0, pants: 0, other: 0, total: 0 },
+                        out: { shirts: 0, pants: 0, other: 0, total: 0 }
+                    };
+                }
+                
+                if (record.type === 'in') {
+                    dateGroups[record.date].in.shirts += record.shirts;
+                    dateGroups[record.date].in.pants += record.pants;
+                    dateGroups[record.date].in.other += record.other;
+                    dateGroups[record.date].in.total += record.total;
+                } else {
+                    dateGroups[record.date].out.shirts += record.shirts;
+                    dateGroups[record.date].out.pants += record.pants;
+                    dateGroups[record.date].out.other += record.other;
+                    dateGroups[record.date].out.total += record.total;
+                }
+            });
+            
+            datewiseStatsGrid.innerHTML = '';
+            
+            if (Object.keys(dateGroups).length === 0) {
+                datewiseStatsGrid.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No data available</div>';
+            } else {
+                Object.values(dateGroups).sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(group => {
+                    const card = document.createElement('div');
+                    card.className = 'date-total-card text-white p-4 rounded-lg';
+                    card.innerHTML = `
+                        <div class="font-bold text-lg mb-3">${group.date}</div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-green-500/20 p-2 rounded">
+                                <div class="text-sm">IN</div>
+                                <div class="font-bold">${group.in.total}</div>
+                                <div class="text-xs">S:${group.in.shirts} P:${group.in.pants} O:${group.in.other}</div>
+                            </div>
+                            <div class="bg-red-500/20 p-2 rounded">
+                                <div class="text-sm">OUT</div>
+                                <div class="font-bold">${group.out.total}</div>
+                                <div class="text-xs">S:${group.out.shirts} P:${group.out.pants} O:${group.out.other}</div>
+                            </div>
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-white/20">
+                            <div class="text-sm">NET: ${group.in.total - group.out.total}</div>
+                            <div class="text-xs">TOTAL: ${group.in.total + group.out.total}</div>
+                        </div>
+                    `;
+                    datewiseStatsGrid.appendChild(card);
+                });
+            }
+        }
+
+        // Function to prompt for password before deleting
+        function promptForDelete(id) {
+            recordToDeleteId = id; // Store the ID
+            passwordModal.classList.remove('hidden'); // Show the modal
+            deletePasswordInput.value = ''; // Clear any previous input
+            deletePasswordInput.focus(); // Focus on the password input
+        }
+
+        // Event listener for confirming delete in the modal
+        confirmDeleteBtn.addEventListener('click', () => {
+            const enteredPassword = deletePasswordInput.value;
+            if (enteredPassword === ADMIN_PASSWORD) {
+                deleteRecord(recordToDeleteId); // Proceed with deletion
+                passwordModal.classList.add('hidden'); // Hide the modal
+            } else {
+                showNotification('Incorrect password!', 'error');
+                deletePasswordInput.value = ''; // Clear incorrect password
+            }
+        });
+
+        // Event listener for canceling delete in the modal
+        cancelDeleteBtn.addEventListener('click', () => {
+            passwordModal.classList.add('hidden'); // Hide the modal
+            recordToDeleteId = null; // Clear the stored ID
+        });
+
+        // Actual delete record function (now called after password verification)
+        function deleteRecord(id) {
+            laundryRef.child(id).remove()
+                .then(() => {
+                    showNotification('Record deleted successfully');
+                    // Data will be updated via the 'value' listener
+                })
+                .catch(error => {
+                    showNotification(`Error deleting record: ${error.message}`, 'error');
+                });
+        }
+
+        // Event listeners for filters
+        filterFloor.addEventListener('change', function() {
+            const activeTab = document.querySelector('.tab.active').textContent.toLowerCase();
+            if (activeTab.includes('overall')) {
+                updateOverallStatistics();
+            } else if (activeTab.includes('date')) {
+                updateDatewiseStatistics();
+            } else {
+                loadRecords();
+            }
+            updateRoomFilter();
+        });
+
+        filterRoom.addEventListener('change', function() {
+            const activeTab = document.querySelector('.tab.active').textContent.toLowerCase();
+            if (activeTab.includes('detailed')) {
+                loadRecords();
+            } else if (activeTab.includes('date')) { // Added for datewise summary
+                updateDatewiseStatistics();
+            }
+        });
+
+        filterDate.addEventListener('change', function() {
+            const activeTab = document.querySelector('.tab.active').textContent.toLowerCase();
+            if (activeTab.includes('detailed')) {
+                loadRecords();
+            } else if (activeTab.includes('date')) {
+                updateDatewiseStatistics();
+            }
+        });
+
+        filterType.addEventListener('change', function() {
+            const activeTab = document.querySelector('.tab.active').textContent.toLowerCase();
+            if (activeTab.includes('detailed')) {
+                loadRecords();
+            } else if (activeTab.includes('date')) { // Added for datewise summary
+                updateDatewiseStatistics();
+            }
+        });
+
+        // Firebase data listener
+        laundryRef.on('value', (snapshot) => {
+            laundryRecords = [];
+            snapshot.forEach((childSnapshot) => {
+                laundryRecords.push(childSnapshot.val());
+            });
+            // Re-render all relevant parts of the UI after data changes
+            const activeTab = document.querySelector('.tab.active')?.textContent.toLowerCase();
+            if (activeTab) {
+                if (activeTab.includes('overall')) {
+                    updateOverallStatistics();
+                } else if (activeTab.includes('date')) {
+                    updateDatewiseStatistics();
+                } else if (activeTab.includes('detailed')) {
+                    loadRecords();
+                }
+            }
+            // Crucially, call updateRoomButtonColors after laundryRecords is updated
+            updateRoomButtonColors(); 
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default page to submit page
+            submitPage.classList.remove('hidden');
+            recordsPage.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
